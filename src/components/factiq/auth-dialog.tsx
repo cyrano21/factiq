@@ -9,8 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { ReceiptText } from "lucide-react";
 import type { FactiqUser } from "./types";
 
@@ -30,11 +32,18 @@ export default function AuthDialog({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     setError(null);
+    if (mode === "register" && !consent) {
+      setError(
+        "Veuillez accepter la politique de confidentialité pour créer votre compte."
+      );
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/auth/${mode}`, {
@@ -120,12 +129,48 @@ export default function AuthDialog({
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
           </div>
+          {mode === "register" && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2.5">
+              <Checkbox
+                id="rgpd-consent"
+                checked={consent}
+                onCheckedChange={(v) => setConsent(v === true)}
+                className="mt-0.5 border-white/25 data-[state=checked]:border-lime data-[state=checked]:bg-lime data-[state=checked]:text-primary-foreground"
+              />
+              <label
+                htmlFor="rgpd-consent"
+                className="cursor-pointer text-[12.5px] leading-relaxed text-muted-foreground"
+              >
+                J'accepte que mes données soient traitées conformément à la{" "}
+                <Link
+                  href="/legal/confidentialite"
+                  target="_blank"
+                  className="text-lime/90 underline decoration-lime/30 underline-offset-2 hover:text-lime"
+                >
+                  politique de confidentialité
+                </Link>
+                , et je reconnais avoir pris connaissance des{" "}
+                <Link
+                  href="/legal/cgv"
+                  target="_blank"
+                  className="text-lime/90 underline decoration-lime/30 underline-offset-2 hover:text-lime"
+                >
+                  CGV
+                </Link>
+                .
+              </label>
+            </div>
+          )}
           {error && (
             <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-red-300">
               {error}
             </p>
           )}
-          <Button className="w-full font-medium" onClick={submit} disabled={busy}>
+          <Button
+            className="w-full font-medium"
+            onClick={submit}
+            disabled={busy || (mode === "register" && !consent)}
+          >
             {busy
               ? "Un instant…"
               : mode === "register"

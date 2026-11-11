@@ -24,6 +24,9 @@ les plateformes agréées (PDP) de la réforme de facturation électronique
 - **Dashboard** KPI (facturé TTC, en attente, encaissé, clients)
 - **Plans Gratuit (5 factures) / Pro illimité**, pont **Stripe Checkout** réel
   (mode test) avec confirmation au retour
+- **Conformité commerciale** : pages légales (mentions légales, CGV,
+  politique de confidentialité RGPD), consentement à l'inscription, SEO
+  (metadata OpenGraph, JSON-LD Application+FAQ, sitemap.xml, robots.txt)
 
 ## Démarrage rapide
 
@@ -68,8 +71,11 @@ formé et totaux exacts, paramètres émetteur, pont Stripe, suppression.
 ```
 src/
   app/page.tsx                 landing + app (client) + retour Stripe
+  app/legal/                   mentions-légales · cgv · confidentialité (RGPD)
+  app/sitemap.ts · robots.ts   SEO dynamique (NEXT_PUBLIC_SITE_URL)
   app/api/                     auth · clients · invoices (+pdf, +xml) · settings · billing
   components/factiq/           landing.tsx · app-shell.tsx · invoice-editor.tsx · panels
+  components/legal/            briques de mise en page des documents légaux
   components/landing/          primitives d'animation (FadeUp, CountUp, Ticker, SmoothScroll)
   lib/facturx.ts               générateur XML CII EN 16931 (profil EN 16931)
   lib/invoice-pdf.ts           PDF A4 (pdf-lib) + pièce jointe factur-x.xml
@@ -77,6 +83,36 @@ src/
 prisma/schema.prisma           User · Session · Client · Invoice · InvoiceLine
 scripts/seed.ts                démo idempotente
 ```
+
+## Mise en production — checklist
+
+Pour transformer cette base de code en activité qui encaisse, dans l'ordre :
+
+1. **Domaine + hébergement.** Réserver le domaine (ex. factiq.fr) et déployer
+   (VPS avec `bun run build && bun run start` derrière Caddy/Nginx, ou Vercel).
+   Définir `NEXT_PUBLIC_SITE_URL=https://votre-domaine.fr` (sitemap, robots,
+   canoniques, OpenGraph).
+2. **Stripe réel.** Compte Stripe → clés API live, créer deux produits à
+   abonnement (Pro 9 €/mois, Bureau 29 €/mois), renseigner
+   `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUREAU`.
+   Tester d'abord en mode test (carte 4242 4242 4242 4242).
+3. **Personnaliser les pages légales.** Chercher `[À compléter` dans
+   `src/app/legal/` : identité éditeur (dénomination, forme, capital, RCS,
+   SIREN, siège, TVA intracom), directeur de publication, hébergeur, e-mails
+   de contact, médiateur de la consommation, tribunal compétent. La société
+   exploitante doit exister juridiquement (micro-entreprise possible) pour
+   encaisser légalement.
+4. **Base de données.** SQLite convient pour démarrer (TPE, trafic modéré) ;
+   passer à PostgreSQL (Prisma `provider = "postgresql"`) pour la haute
+   disponibilité et les sauvegardes managées.
+5. **Email transactionnel** (Resend, Brevo…) pour la bienvenue, les factures
+   d'abonnement et les reçus Stripe.
+6. **Référencement.** Soumettre le sitemap à Google Search Console, créer
+   les pages de contenu SEO (« facture électronique micro-entrepreneur »,
+   « réforme 2027 », « Factur-X ») pour l'acquisition organique.
+7. **PDP.** Signer un partenariat avec une plateforme agréée pour la
+   transmission (route vers 2027), Factiq produit déjà les fichiers
+   conformes.
 
 ## Roadmap
 

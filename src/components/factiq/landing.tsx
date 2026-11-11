@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   animate,
@@ -974,22 +975,49 @@ export default function Landing({
               plateforme agréée (PDP) ni un conseil fiscal. Démonstration produit.
             </p>
           </div>
-          <nav className="flex flex-col gap-2.5 text-sm text-muted-foreground">
-            {NAV_LINKS.map(([label, href]) => (
-              <button
-                key={href}
-                onClick={() => scrollTo(href)}
-                className="text-left transition-colors hover:text-foreground"
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <div className="flex gap-16">
+            <nav className="flex flex-col gap-2.5 text-sm text-muted-foreground">
+              {NAV_LINKS.map(([label, href]) => (
+                <button
+                  key={href}
+                  onClick={() => scrollTo(href)}
+                  className="text-left transition-colors hover:text-foreground"
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+            <nav className="flex flex-col gap-2.5 text-sm text-muted-foreground">
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/60">
+                Légal
+              </p>
+              <Link href="/legal/mentions-legales" className="transition-colors hover:text-foreground">
+                Mentions légales
+              </Link>
+              <Link href="/legal/cgv" className="transition-colors hover:text-foreground">
+                CGV
+              </Link>
+              <Link href="/legal/confidentialite" className="transition-colors hover:text-foreground">
+                Confidentialité
+              </Link>
+            </nav>
+          </div>
         </div>
         <div className="border-t border-white/[0.06]">
-          <p className="mx-auto max-w-6xl px-4 py-5 text-xs text-muted-foreground/60 sm:px-6">
-            © 2026 Factiq — Démo produit · Conçu avec soin.
-          </p>
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-5 text-xs text-muted-foreground/60 sm:px-6">
+            <p>© 2026 Factiq — Démo produit · Conçu avec soin.</p>
+            <div className="flex gap-x-5">
+              <Link href="/legal/mentions-legales" className="transition-colors hover:text-foreground">
+                Mentions légales
+              </Link>
+              <Link href="/legal/cgv" className="transition-colors hover:text-foreground">
+                CGV
+              </Link>
+              <Link href="/legal/confidentialite" className="transition-colors hover:text-foreground">
+                Confidentialité
+              </Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
