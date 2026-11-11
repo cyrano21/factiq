@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  // Identité émettrice (mentions légales de facturation)
+  legalName    String?
+  siret        String?
+  siretNic     String?
+  vatNumber    String?
+  address      String?
+  zip          String?
+  city         String?
+  iban         String?
+  // "standard" (assujetti TVA) | "franchise" (art. 293 B du CGI)
+  vatMode      String    @default("standard")
+  // free | pro
+  plan         String    @default("free")
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  clients      Client[]
+  invoices     Invoice[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  address   String?
+  zip       String?
+  city      String?
+  siret     String?
+  vatNumber String?
+  createdAt DateTime  @default(now())
+  invoices  Invoice[]
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  number         String
+  issueDate      String
+  dueDate        String
+  // draft | sent | paid
+  status         String        @default("draft")
+  currency       String        @default("EUR")
+  vatRate        Float         @default(20)
+  vatMode        String        @default("standard")
+  paymentTerms   String        @default("Paiement à 30 jours")
+  notes          String?
+  createdAt      DateTime      @default(now())
+  lines          InvoiceLine[]
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  sortOrder   Int     @default(0)
+}

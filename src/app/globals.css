@@ -1,0 +1,250 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-serif: var(--font-instrument-serif);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-lime: var(--lime);
+  --color-lime-soft: var(--lime-soft);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ————————————————————————————————————————————————
+   Factiq — thème « encre & lime » : sombre premium,
+   accents lime électrique (CTA) et émeraude (données).
+   ———————————————————————————————————————————————— */
+:root {
+  --radius: 0.875rem;
+  --lime: #d7f75b;
+  --lime-soft: #eaffa4;
+  --background: #0a0c0b;
+  --foreground: #e9f0eb;
+  --card: #101413;
+  --card-foreground: #e9f0eb;
+  --popover: #131715;
+  --popover-foreground: #e9f0eb;
+  --primary: #d7f75b;
+  --primary-foreground: #161a03;
+  --secondary: #1a1f1d;
+  --secondary-foreground: #e9f0eb;
+  --muted: #161a19;
+  --muted-foreground: #93a29a;
+  --accent: #1c2420;
+  --accent-foreground: #d9f99d;
+  --destructive: #e5484d;
+  --border: rgba(233, 240, 235, 0.09);
+  --input: rgba(233, 240, 235, 0.14);
+  --ring: #d7f75b;
+  --chart-1: #d7f75b;
+  --chart-2: #34d399;
+  --chart-3: #0d9488;
+  --chart-4: #a7f3d0;
+  --chart-5: #5f6f66;
+  --sidebar: #101413;
+  --sidebar-foreground: #e9f0eb;
+  --sidebar-primary: #d7f75b;
+  --sidebar-primary-foreground: #161a03;
+  --sidebar-accent: #1a1f1d;
+  --sidebar-accent-foreground: #e9f0eb;
+  --sidebar-border: rgba(233, 240, 235, 0.09);
+  --sidebar-ring: #d7f75b;
+}
+
+.dark {
+  --background: #0a0c0b;
+  --foreground: #e9f0eb;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+    position: relative;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: var(--lime);
+    color: #161a03;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-gradient-lime {
+    background: linear-gradient(100deg, #eaffa4 0%, #d7f75b 45%, #6ee7b7 110%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Fine blueprint grid, faded with a radial mask by the caller */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(233, 240, 235, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(233, 240, 235, 0.05) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+/* Radial glows */
+.glow-lime {
+  background: radial-gradient(
+    closest-side,
+    rgba(215, 247, 91, 0.11),
+    transparent
+  );
+}
+.glow-emerald {
+  background: radial-gradient(
+    closest-side,
+    rgba(16, 185, 129, 0.09),
+    transparent
+  );
+}
+
+/* Card lift on hover — fine pointers only */
+@media (hover: hover) and (pointer: fine) {
+  .card-lift {
+    transition:
+      transform 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+      border-color 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+      box-shadow 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .card-lift:hover {
+    transform: translateY(-4px);
+    border-color: rgba(215, 247, 91, 0.28);
+    box-shadow:
+      0 18px 44px -20px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(215, 247, 91, 0.06);
+  }
+}
+
+/* Floating satellites around the hero mockup */
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float {
+  animation: float-y 7s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: float-y 9.5s ease-in-out 1.2s infinite;
+}
+
+/* Soft ping for live status dots */
+@keyframes ping-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.animate-ping-soft {
+  animation: ping-soft 1.9s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Loading shimmer rows */
+@keyframes shimmer-x {
+  to {
+    background-position: -200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(233, 240, 235, 0.05) 25%,
+    rgba(233, 240, 235, 0.11) 50%,
+    rgba(233, 240, 235, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-x 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-float-slow,
+  .animate-ping-soft,
+  .shimmer {
+    animation: none;
+  }
+  .card-lift,
+  .card-lift:hover {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Custom scrollbar — ink */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0c0b;
+}
+::-webkit-scrollbar-thumb {
+  background: #262b28;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #333a36;
+}
