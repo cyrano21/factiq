@@ -68,7 +68,9 @@ model Invoice {
   // draft | sent | paid
   status         String        @default("draft")
   currency       String        @default("EUR")
-  vatRate        Float         @default(20)
+  // Taux de TVA en CENTIÈMES de pourcentage (20 % → 2000, 5,5 % → 550) :
+  // aucun montant monétaire en Float (voir src/lib/money.ts et AGENTS.md §2).
+  vatRateCentiemes Int         @default(2000)
   vatMode        String        @default("standard")
   paymentTerms   String        @default("Paiement à 30 jours")
   notes          String?
@@ -79,13 +81,15 @@ model Invoice {
 }
 
 model InvoiceLine {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  description String
-  quantity    Float   @default(1)
-  unitPrice   Float
-  sortOrder   Int     @default(0)
+  id             String  @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description    String
+  // Quantité : grandeur NON monétaire (heures fractionnaires admises).
+  quantity       Float   @default(1)
+  // Prix unitaire en CENTIMES d'euro (12,30 € → 1230) : entier, jamais Float.
+  unitPriceCents Int
+  sortOrder      Int     @default(0)
 }
 
 // Compteur de numérotation par utilisateur et par année : ne décroît jamais,

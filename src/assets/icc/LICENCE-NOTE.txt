@@ -1,0 +1,32 @@
+Profil ICC sRGB embarqué dans les PDF Factiq (OutputIntent PDF/A-3)
+====================================================================
+
+Fichier vendu (binaire inchangé) :
+  - srgb.icc (2,5 Ko environ)
+
+Source
+------
+Copié depuis Ghostscript 10.05.1 :
+  /usr/share/ghostscript/10.05.1/iccprofiles/srgb.icc
+Projet : https://ghostscript.com (Artifex Software).
+
+Licence
+-------
+Ghostscript est distribué sous GNU AGPL-3.0 ; ce fichier fait partie de la
+distribution Ghostscript (dossier iccprofiles). C'est un profil de couleur
+de type données décrivant l'espace standard sRGB (IEC 61966-2-1).
+
+Note pour l'exploitation (handoff) : l'AGPL s'applique à la distribution de
+Ghostscript ; un profil ICC de couleur est un fichier de données. Pour une
+redistribution strictement sereine (produit commercial fermé), il est
+recommandé de remplacer ce fichier par un profil sRGB publié sous licence
+libre explicite (par exemple les profils de référence de l'IEC/sRGB via
+www.color.org, ou « sRGB v4 » du ICC). Le code de src/lib/pdfa.ts charge
+ce chemin d'asset de façon agnostique : remplacer le binaire suffit, aucun
+changement de code n'est nécessaire.
+
+Usage dans Factiq
+-----------------
+Embarqué comme /DestOutputProfile d'un /OutputIntent /S /GTS_PDFA1
+(/OutputConditionIdentifier « sRGB », stream avec /N 3) dans le catalogue
+des PDF de facture, comme l'exige PDF/A-3B.

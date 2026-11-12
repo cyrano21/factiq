@@ -17,10 +17,17 @@ les plateformes agréées (PDP) de la réforme de facturation électronique
 - **Factures** : création multi-lignes, numérotation `FAC-AAAA-NNNN`,
   statuts brouillon / envoyée / payée, TVA standard (20/10/5,5 %) **ou
   franchise** (mention « TVA non applicable, art. 293 B du CGI »)
-- **PDF Factur-X** : A4 professionnel avec pièce jointe `factur-x.xml`
-  embarquée (format hybride lisible par l'humain et la machine)
+- **Monnaie en centimes entiers** : `unitPriceCents` / `vatRateCentiemes`
+  (Int) en base, API et calculs — zéro arithmétique flottante sur l'argent
+  (`src/lib/money.ts`, BR-CO-10/17) ; l'API refuse tout montant décimal
+- **PDF Factur-X / PDF/A-3B** : A4 professionnel, polices embarquées, XMP
+  `pdfaid:part=3` + bloc `fx:` Factur-X, pièce jointe `factur-x.xml` en
+  `/AF` (`AFRelationship /Data` + `/UF`), OutputIntent ICC sRGB (format
+  hybride lisible par l'humain et la machine) ; mentions obligatoires
+  (escompte, pénalités de retard art. L441-10/D441-5)
 - **XML CII EN 16931** téléchargeable séparément (D16B, codes catégorie S/E,
-  exonération art. 293 B)
+  exonération art. 293 B) + validateur structurel `validateFacturXXml`
+  (BR-CO-10/11/12, guideline, TypeCode)
 - **Dashboard** KPI (facturé TTC, en attente, encaissé, clients)
 - **Plans Gratuit (5 factures) / Pro illimité**, pont **Stripe Checkout** réel
   (mode test) avec confirmation au retour
@@ -126,12 +133,12 @@ Pour transformer cette base de code en activité qui encaisse, dans l'ordre :
 
 ## Roadmap
 
-- **P1 — Conformité documentaire** : PDF/A-3B strict (OutputIntent ICC + XMP
-  Factur-X + AF/AFRelationship), validation XSD/Schematron EN 16931 (outils
-  FNFE-MPE), mentions manquantes (nature de l'opération, SIREN client
-  visible, adresse de livraison, TVA sur les débits)
-- **P1 — Solidité monétaire** : passage des montants en centimes entiers
-  (`Int`) et support multi-taux de TVA par facture
+- ~~PDF/A-3B (OutputIntent ICC + XMP Factur-X + AF/AFRelationship)~~ **fait** ;
+  reste : validation XSD/Schematron EN 16931 (outils FNFE-MPE), mentions
+  complémentaires (nature de l'opération, adresse de livraison, TVA sur les
+  débits)
+- ~~Montants en centimes entiers (`Int`)~~ **fait** ; reste : multi-taux de
+  TVA par facture
 - Devis → facture, avoirs, paiements partiels, factures récurrentes,
   relances, export comptable / archivage 10 ans
 - Connexion PDP (plateforme agréée) pour la transmission fluide

@@ -17,14 +17,18 @@ import {
   Trash2,
 } from "lucide-react";
 import { STATUS_LABEL, type FactiqInvoice } from "./types";
+import { computeTotalsCents, formatEUR } from "@/lib/money";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-const eur = (n: number) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
+// Affichage monétaire : TOUJOURS depuis des centimes entiers (src/lib/money.ts).
+const eur = (cents: number) => formatEUR(cents);
 
 const ttcOf = (inv: FactiqInvoice) =>
-  inv.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0) *
-  (1 + (inv.vatMode === "franchise" ? 0 : inv.vatRate / 100));
+  computeTotalsCents(
+    inv.lines.map((l) => ({ quantity: l.quantity, unitPriceCents: l.unitPriceCents })),
+    inv.vatRateCentiemes,
+    inv.vatMode === "franchise" ? "franchise" : "standard"
+  ).totalTCCCents;
 
 const statusDot = (s: string) =>
   s === "paid" ? (

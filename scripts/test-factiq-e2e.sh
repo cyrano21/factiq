@@ -20,7 +20,7 @@ echo "═══ 2. Inscription d'un nouveau compte ═══"
 EMAIL="test$(date +%s)@factiq-test.fr"
 code=$(curl -s -c "$JAR" -o /tmp/reg.json -w "%{http_code}" -X POST "$BASE/api/auth/register" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"Test1234!\",\"name\":\"Utilisateur Test\"}")
+  -d "{\"email\":\"$EMAIL\",\"password\":\"Test1234!Factiq\",\"name\":\"Utilisateur Test\"}")
 check "POST /api/auth/register" 200 "$code"
 grep -q '"email"' /tmp/reg.json && ok "Réponse contient le user" || bad "Réponse register invalide: $(head -c 200 /tmp/reg.json)"
 
@@ -44,7 +44,7 @@ CLIENT_ID=$(python3 -c "import json;print(json.load(open('/tmp/client.json'))['c
 echo "═══ 6. Création d'une facture (2 lignes) ═══"
 code=$(curl -s -b "$JAR" -o /tmp/inv.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
   -H "Content-Type: application/json" \
-  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Prestation conseil\",\"quantity\":3,\"unitPrice\":450},{\"description\":\"Support mensuel\",\"quantity\":1,\"unitPrice\":150}],\"vatRate\":20,\"notes\":\"Merci de votre confiance.\"}")
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Prestation conseil\",\"quantity\":3,\"unitPriceCents\":45000},{\"description\":\"Support mensuel\",\"quantity\":1,\"unitPriceCents\":15000}],\"vatRate\":20,\"notes\":\"Merci de votre confiance.\"}")
 check "POST /api/invoices" 200 "$code"
 INV_ID=$(python3 -c "import json;print(json.load(open('/tmp/inv.json'))['invoice']['id'])" 2>/dev/null)
 INV_NUM=$(python3 -c "import json;print(json.load(open('/tmp/inv.json'))['invoice']['number'])" 2>/dev/null)
@@ -120,7 +120,7 @@ check "PATCH émise → draft refusé (409)" 409 "$code"
 # Un brouillon, lui, reste supprimable
 code=$(curl -s -b "$JAR" -o /tmp/inv2.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
   -H "Content-Type: application/json" \
-  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Draft\",\"quantity\":1,\"unitPrice\":100}]}")
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Draft\",\"quantity\":1,\"unitPriceCents\":10000}]}")
 check "POST facture brouillon" 200 "$code"
 DRAFT_ID=$(python3 -c "import json;print(json.load(open('/tmp/inv2.json'))['invoice']['id'])")
 code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/invoices/$DRAFT_ID")
@@ -129,13 +129,121 @@ check "DELETE brouillon" 200 "$code"
 # Le numéro du brouillon supprimé ne doit pas être réutilisé
 code=$(curl -s -b "$JAR" -o /tmp/inv3.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
   -H "Content-Type: application/json" \
-  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Suite\",\"quantity\":1,\"unitPrice\":100}]}")
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Suite\",\"quantity\":1,\"unitPriceCents\":10000}]}")
 check "POST facture suivante" 200 "$code"
 NUM3=$(python3 -c "import json;print(json.load(open('/tmp/inv3.json'))['invoice']['number'])")
 NUM2=$(python3 -c "import json;print(json.load(open('/tmp/inv2.json'))['invoice']['number'])")
 if [ "${NUM3##*-}" -gt "${NUM2##*-}" ]; then ok "Numérotation sans réutilisation ($NUM2 supprimé → $NUM3)"; else bad "Numéro réutilisé ($NUM2 → $NUM3)"; fi
 INV3_ID=$(python3 -c "import json;print(json.load(open('/tmp/inv3.json'))['invoice']['id'])")
 curl -s -b "$JAR" -o /dev/null -X DELETE "$BASE/api/invoices/$INV3_ID"
+
+echo "═══ 14. Validations des entrées facture (rejets 400) ═══"
+
+# @cas VAL-01 — POST facture quantity négative → 400
+code=$(curl -s -b "$JAR" -o /tmp/val1.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Quantité négative\",\"quantity\":-2,\"unitPriceCents\":10000}]}")
+check "POST quantité négative → 400" 400 "$code"
+grep -q "strictement" /tmp/val1.json && ok "Message de validation français présent" || bad "Message de validation absent: $(head -c 200 /tmp/val1.json)"
+
+# @cas VAL-02 — POST facture vatRate 150 → 400
+code=$(curl -s -b "$JAR" -o /tmp/val2.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"vatRateCentiemes\":15000,\"lines\":[{\"description\":\"TVA farfelue\",\"quantity\":1,\"unitPriceCents\":10000}]}")
+check "POST vatRate 150 → 400" 400 "$code"
+grep -q "taux de TVA" /tmp/val2.json && ok "Message taux de TVA présent" || bad "Message taux absent: $(head -c 200 /tmp/val2.json)"
+
+# @cas VAL-03 — POST facture dueDate < issueDate → 400
+code=$(curl -s -b "$JAR" -o /tmp/val3.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"issueDate\":\"2026-01-15\",\"dueDate\":\"2026-01-14\",\"lines\":[{\"description\":\"Échéance avant émission\",\"quantity\":1,\"unitPriceCents\":10000}]}")
+check "POST dueDate < issueDate → 400" 400 "$code"
+grep -q "date d" /tmp/val3.json && ok "Message dates incohérentes présent" || bad "Message dates absent: $(head -c 200 /tmp/val3.json)"
+
+# @cas VAL-04 — POST facture description vide → 400
+code=$(curl -s -b "$JAR" -o /tmp/val4.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"   \",\"quantity\":1,\"unitPriceCents\":10000}]}")
+check "POST description vide → 400" 400 "$code"
+grep -q "ligne doit avoir" /tmp/val4.json && ok "Message désignation requise présent" || bad "Message désignation absent: $(head -c 200 /tmp/val4.json)"
+
+# @cas VAL-05 — POST facture client inconnu (ou d'un autre compte) → 400
+code=$(curl -s -b "$JAR" -o /tmp/val5.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"client-inexistant-xyz\",\"lines\":[{\"description\":\"Client fantôme\",\"quantity\":1,\"unitPriceCents\":10000}]}")
+check "POST client inconnu → 400" 400 "$code"
+grep -q "Client invalide" /tmp/val5.json && ok "Message client invalide présent" || bad "Message client absent: $(head -c 200 /tmp/val5.json)"
+
+echo "═══ 15. Transitions forward-only (pièces comptables) ═══"
+
+# @cas VAL-06 — PATCH sent→draft → 409 (facture émise immuable)
+code=$(curl -s -b "$JAR" -o /tmp/val6.json -w "%{http_code}" -X PATCH "$BASE/api/invoices/$INV_ID" \
+  -H "Content-Type: application/json" -d '{"status":"draft"}')
+check "PATCH sent → draft refusé (409)" 409 "$code"
+grep -q "brouillon" /tmp/val6.json && ok "Message immuabilité présent" || bad "Message immuabilité absent: $(head -c 200 /tmp/val6.json)"
+
+# @cas VAL-07 — PATCH paid→sent → 409 (paid est terminal)
+code=$(curl -s -b "$JAR" -o /tmp/val7.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Prestation payée\",\"quantity\":1,\"unitPriceCents\":5000}]}")
+check "POST facture à payer" 200 "$code"
+PAID_ID=$(python3 -c "import json;print(json.load(open('/tmp/val7.json'))['invoice']['id'])" 2>/dev/null)
+[ -n "$PAID_ID" ] && ok "Facture à payer créée" || bad "Facture à payer non créée: $(head -c 200 /tmp/val7.json)"
+curl -s -b "$JAR" -o /dev/null -X PATCH "$BASE/api/invoices/$PAID_ID" -H "Content-Type: application/json" -d '{"status":"sent"}'
+code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X PATCH "$BASE/api/invoices/$PAID_ID" \
+  -H "Content-Type: application/json" -d '{"status":"paid"}')
+check "PATCH sent → paid" 200 "$code"
+code=$(curl -s -b "$JAR" -o /tmp/val7b.json -w "%{http_code}" -X PATCH "$BASE/api/invoices/$PAID_ID" \
+  -H "Content-Type: application/json" -d '{"status":"sent"}')
+check "PATCH paid → sent refusé (409)" 409 "$code"
+grep -q "terminal" /tmp/val7b.json && ok "Message statut terminal présent" || bad "Message terminal absent: $(head -c 200 /tmp/val7b.json)"
+
+echo "═══ 16. Numérotation : brouillon supprimé, numéro jamais réutilisé ═══"
+
+
+# @cas VAL-10 — centimes : 3 lignes de 0,10 € à 5,5 % → XML HT 0,30 / TVA 0,02
+code=$(curl -s -b "$JAR" -o /tmp/val10.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"vatRateCentiemes\":550,\"lines\":[{\"description\":\"Micro-ligne 1\",\"quantity\":1,\"unitPriceCents\":10},{\"description\":\"Micro-ligne 2\",\"quantity\":1,\"unitPriceCents\":10},{\"description\":\"Micro-ligne 3\",\"quantity\":1,\"unitPriceCents\":10}]}")
+check "POST facture centimes (3 × 0,10 € à 5,5 %)" 200 "$code"
+CENTS_ID=$(python3 -c "import json;print(json.load(open('/tmp/val10.json'))['invoice']['id'])" 2>/dev/null)
+code=$(curl -s -b "$JAR" -o /tmp/val10.xml -w "%{http_code}" "$BASE/api/invoices/$CENTS_ID/xml")
+check "GET XML facture centimes" 200 "$code"
+python3 - <<'PYEOF' && ok "Totaux XML exacts en centimes (HT 0.30, TVA 0.02, TTC 0.32)" || bad "Totaux XML centimes faux"
+import xml.etree.ElementTree as ET
+r = ET.parse('/tmp/val10.xml').getroot()
+ns = {'rsm':'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100',
+      'ram':'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'}
+def val(p):
+    e = r.find(p, ns); assert e is not None, f"nœud manquant: {p}"; return e.text
+assert val('.//ram:TaxBasisTotalAmount') == '0.30', f"HT={val('.//ram:TaxBasisTotalAmount')}"
+assert val('.//ram:TaxTotalAmount') == '0.02', f"TVA={val('.//ram:TaxTotalAmount')}"
+assert val('.//ram:GrandTotalAmount') == '0.32', f"TTC={val('.//ram:GrandTotalAmount')}"
+PYEOF
+curl -s -b "$JAR" -o /dev/null -X DELETE "$BASE/api/invoices/$CENTS_ID"
+
+# @cas VAL-09 — DELETE client avec facture émise → 409 (pièce comptable, cascade interdite)
+code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/clients/$CLIENT_ID")
+check "DELETE client avec facture émise → 409" 409 "$code"
+
+# @cas VAL-08 — DELETE brouillon → 200 puis recréation → numéro SUIVANT (pas réutilisé)
+code=$(curl -s -b "$JAR" -o /tmp/val8a.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Brouillon A\",\"quantity\":1,\"unitPriceCents\":10000}]}")
+check "POST brouillon A" 200 "$code"
+DRAFT_A_ID=$(python3 -c "import json;print(json.load(open('/tmp/val8a.json'))['invoice']['id'])" 2>/dev/null)
+DRAFT_A_NUM=$(python3 -c "import json;print(json.load(open('/tmp/val8a.json'))['invoice']['number'])" 2>/dev/null)
+code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/invoices/$DRAFT_A_ID")
+check "DELETE brouillon → 200" 200 "$code"
+code=$(curl -s -b "$JAR" -o /tmp/val8b.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Brouillon B\",\"quantity\":1,\"unitPriceCents\":10000}]}")
+check "POST brouillon B (après suppression de A)" 200 "$code"
+DRAFT_B_NUM=$(python3 -c "import json;print(json.load(open('/tmp/val8b.json'))['invoice']['number'])" 2>/dev/null)
+DRAFT_B_ID=$(python3 -c "import json;print(json.load(open('/tmp/val8b.json'))['invoice']['id'])" 2>/dev/null)
+# Base 10 explicite : NNNN a des zéros de tête (0008 serait lu comme octal).
+if [ $((10#${DRAFT_B_NUM##*-})) -gt $((10#${DRAFT_A_NUM##*-})) ]; then ok "Numéro non réutilisé ($DRAFT_A_NUM supprimé → $DRAFT_B_NUM)"; else bad "Numéro réutilisé ($DRAFT_A_NUM → $DRAFT_B_NUM)"; fi
+curl -s -b "$JAR" -o /dev/null -X DELETE "$BASE/api/invoices/$DRAFT_B_ID"
 
 echo ""
 echo "════════ RÉSULTAT : $PASS réussis, $FAIL échoués ════════"

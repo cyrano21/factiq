@@ -9,3 +9,7 @@ dev.log
 server.log
 .DS_Store
 *.tsbuildinfo
+.unlazy/
+
+# Base de données dev + backups : données personnelles, jamais sur GitHub
+db/

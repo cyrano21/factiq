@@ -1,10 +1,6 @@
 import { db } from "@/lib/db";
-import {
-  buildFacturXXml,
-  computeTotals,
-  type FacturXInput,
-  type FacturXLine,
-} from "@/lib/facturx";
+import { buildFacturXXml, type FacturXInput, type FacturXLine } from "@/lib/facturx";
+import { computeTotalsCents, type TotalsCents } from "@/lib/money";
 
 export async function loadInvoiceForUser(invoiceId: string, userId: string) {
   return db.invoice.findUnique({
@@ -31,7 +27,7 @@ export function buildFacturXInput(inv: {
   issueDate: string;
   dueDate: string;
   currency: string;
-  vatRate: number;
+  vatRateCentiemes: number;
   vatMode: string;
   paymentTerms: string;
   notes: string | null;
@@ -52,22 +48,22 @@ export function buildFacturXInput(inv: {
     siret: string | null;
     vatNumber: string | null;
   };
-  lines: { description: string; quantity: number; unitPrice: number }[];
-}): FacturXInput & { totals: ReturnType<typeof computeTotals> } {
+  lines: { description: string; quantity: number; unitPriceCents: number }[];
+}): FacturXInput & { totals: TotalsCents } {
   const mode = (inv.vatMode === "franchise" ? "franchise" : "standard") as
     | "franchise"
     | "standard";
   const fxLines: FacturXLine[] = inv.lines.map((l) => ({
     description: l.description,
     quantity: l.quantity,
-    unitPrice: l.unitPrice,
+    unitPriceCents: l.unitPriceCents,
   }));
   const input: FacturXInput = {
     number: inv.number,
     issueDate: inv.issueDate,
     dueDate: inv.dueDate,
     currency: inv.currency,
-    vatRate: inv.vatRate,
+    vatRateCentiemes: inv.vatRateCentiemes,
     vatMode: mode,
     paymentTerms: inv.paymentTerms,
     notes: inv.notes,
@@ -89,7 +85,10 @@ export function buildFacturXInput(inv: {
     },
     lines: fxLines,
   };
-  return { ...input, totals: computeTotals(fxLines, inv.vatRate, mode) };
+  return {
+    ...input,
+    totals: computeTotalsCents(fxLines, inv.vatRateCentiemes, mode),
+  };
 }
 
 export function buildXml(inv: NonNullable<Awaited<ReturnType<typeof loadInvoiceForUser>>>) {

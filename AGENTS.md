@@ -22,15 +22,22 @@ vitrine ou un e-commerce. Elles priment sur toute commodité de développement.
 
 ## 2. Argent et calculs
 
-- Les montants sont des **nombre décimaux monétaires** : tout calcul passe par
-  `round2()` (centimes) et tout affichage via `Intl.NumberFormat("fr-FR")`.
-- La refonte **centimes entiers (Int)** est la cible : ne jamais ajouter de
-  nouveau champ monétaire en Float.
+- Les montants sont des **centimes entiers (Int)** en base (`unitPriceCents`,
+  `vatRateCentiemes` = taux × 100 : 20 % → 2000) et dans toute l'API. AUCUN
+  champ monétaire en Float — un Float monétaire dans une PR est refusé.
+- Tout calcul passe par `src/lib/money.ts` : `toCents()` (saisie « 12,30 » →
+  1230), `formatEUR()` (fr-FR), `lineTotalCents()` et `computeTotalsCents()`
+  (BR-CO-10 : lignes arrondies puis sommées ; BR-CO-17 : TVA arrondie au
+  centime). Toute sérialisation XML/PDF passe par `centsToDecimalString()`
+  (arithmétique entière, jamais une division flottante).
+- L'API n'accepte que des entiers centimes : un montant décimal (12.3) est
+  refusé 400 — aucune réinterprétation silencieuse.
 - Un seul taux de TVA par facture actuellement (contrainte du schéma) : ne pas
   émettre de facture multi-taux sans refonte préalable des totaux
   (EN 16931 exige des totaux par taux).
 - Toute modification de calcul doit être couverte par le test E2E des totaux
-  (HT 1500 / TVA 300 / TTC 1800 au minimum) et par un cas d'arrondi.
+  (HT 1500 / TVA 300 / TTC 1800 au minimum), le cas d'arrondi VAL-10
+  (3 × 0,10 € à 5,5 % → TVA 0,02) et `scripts/money-selftest.mjs`.
 
 ## 3. Conformité réglementaire (France)
 

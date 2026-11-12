@@ -28,7 +28,8 @@ export type InvoiceLine = {
   id: string;
   description: string;
   quantity: number;
-  unitPrice: number;
+  /** Prix unitaire en CENTIMES d'euro (12,30 € → 1230) — jamais en Float. */
+  unitPriceCents: number;
   sortOrder: number;
 };
 
@@ -39,7 +40,8 @@ export type FactiqInvoice = {
   dueDate: string;
   status: string;
   currency: string;
-  vatRate: number;
+  /** Taux de TVA en centièmes de pourcentage (20 % → 2000). */
+  vatRateCentiemes: number;
   vatMode: string;
   paymentTerms: string;
   notes: string | null;

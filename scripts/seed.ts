@@ -50,7 +50,7 @@ async function main() {
     userId: string,
     demos: {
       client: { name: string; email: string; address: string; zip: string; city: string; siret: string };
-      lines: { description: string; quantity: number; unitPrice: number }[];
+      lines: { description: string; quantity: number; unitPriceCents: number }[];
       status: string;
     }[]
   ) => {
@@ -92,7 +92,7 @@ async function main() {
         city: "Lyon",
         siret: "12345678901234",
       },
-      lines: [{ description: "Prestation de conseil", quantity: 3, unitPrice: 450 }],
+      lines: [{ description: "Prestation de conseil", quantity: 3, unitPriceCents: 45000 }],
       status: "draft",
     },
     {
@@ -105,8 +105,8 @@ async function main() {
         siret: "23456789012345",
       },
       lines: [
-        { description: "Identité visuelle", quantity: 1, unitPrice: 1200 },
-        { description: "Développement site (3 j)", quantity: 3, unitPrice: 600 },
+        { description: "Identité visuelle", quantity: 1, unitPriceCents: 120000 },
+        { description: "Développement site (3 j)", quantity: 3, unitPriceCents: 60000 },
       ],
       status: "paid",
     },
@@ -122,7 +122,7 @@ async function main() {
         city: "Bordeaux",
         siret: "34567890123456",
       },
-      lines: [{ description: "Refonte menu & supports", quantity: 1, unitPrice: 1600 }],
+      lines: [{ description: "Refonte menu & supports", quantity: 1, unitPriceCents: 160000 }],
       status: "sent",
     },
   ]);

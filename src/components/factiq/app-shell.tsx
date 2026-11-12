@@ -11,12 +11,11 @@ import InvoicesPanel from "./invoices-panel";
 import ClientsPanel from "./clients-panel";
 import SettingsPanel from "./settings-panel";
 import InvoiceEditor from "./invoice-editor";
+import { computeTotalsCents, formatEUR } from "@/lib/money";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-const eurFmt = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "EUR",
-});
+// Affichage monétaire : TOUJOURS depuis des centimes entiers (src/lib/money.ts).
+const eurFmt = { format: (cents: number) => formatEUR(cents) };
 
 const TABS = [
   { id: "invoices", label: "Factures" },
@@ -93,9 +92,13 @@ export default function AppShell({
   };
 
   const kpis = useMemo(() => {
+    // Totaux KPI en centimes entiers (BR-CO-10 : lignes arrondies puis sommées).
     const ttc = (inv: FactiqInvoice) =>
-      inv.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0) *
-      (1 + (inv.vatMode === "franchise" ? 0 : inv.vatRate / 100));
+      computeTotalsCents(
+        inv.lines.map((l) => ({ quantity: l.quantity, unitPriceCents: l.unitPriceCents })),
+        inv.vatRateCentiemes,
+        inv.vatMode === "franchise" ? "franchise" : "standard"
+      ).totalTCCCents;
     const total = invoices.reduce((s, i) => s + ttc(i), 0);
     const pending = invoices.filter((i) => i.status === "sent").reduce((s, i) => s + ttc(i), 0);
     const paid = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + ttc(i), 0);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { FREE_INVOICE_LIMIT, nextInvoiceNumber } from "@/lib/invoice-service";
+import { httpError, invoiceCreateSchema } from "@/lib/validate";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -14,12 +15,20 @@ export async function GET() {
   return NextResponse.json({ invoices });
 }
 
-type LineInput = { description: string; quantity: number; unitPrice: number };
-
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   try {
+    // 1. Validation du corps (schéma zod) AVANT toute logique métier : un
+    //    payload invalide est refusé 400 avec le premier message français.
+    const parsed = invoiceCreateSchema.safeParse(await req.json().catch(() => null));
+    const validation = httpError(parsed);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.firstError }, { status: 400 });
+    }
+    const data = parsed.data!;
+
+    // 2. Logique métier inchangée pour les payloads valides.
     if (user.plan === "free") {
       const count = await db.invoice.count({ where: { userId: user.id } });
       if (count >= FREE_INVOICE_LIMIT) {
@@ -33,32 +42,20 @@ export async function POST(req: Request) {
       }
     }
 
-    const b = await req.json();
-    const clientId = String(b.clientId ?? "");
+    const clientId = data.clientId;
     const client = await db.client.findUnique({ where: { id: clientId } });
     if (!client || client.userId !== user.id) {
       return NextResponse.json({ error: "Client invalide." }, { status: 400 });
     }
 
-    const lines: LineInput[] = Array.isArray(b.lines)
-      ? b.lines
-          .map((l: LineInput) => ({
-            description: String(l.description ?? "").trim(),
-            quantity: Number(l.quantity) || 0,
-            unitPrice: Number(l.unitPrice) || 0,
-          }))
-          .filter((l: LineInput) => l.description && l.quantity > 0)
-      : [];
-    if (lines.length === 0) {
-      return NextResponse.json(
-        { error: "Ajoutez au moins une ligne avec désignation et quantité." },
-        { status: 400 }
-      );
-    }
-
+    const lines = data.lines; // validées par le schéma : 1 à 200 lignes propres
     const today = new Date().toISOString().slice(0, 10);
     const plus30 = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-    const vatMode = b.vatMode === "franchise" ? "franchise" : user.vatMode;
+    const vatMode = data.vatMode === "franchise" ? "franchise" : user.vatMode;
+    // Le numéro venu du client, s'il existait, a été écarté par le schéma :
+    // la numérotation reste exclusivement serveur (compteur persistant).
+    // Taux en centièmes de pourcentage (20 % → 2000, 5,5 % → 550) ; franchise = 0.
+    const vatRateCentiemes = vatMode === "franchise" ? 0 : (data.vatRateCentiemes ?? 2000);
 
     // Course sur la numérotation : l'index unique (userId, number) arbitre.
     // 3 tentatives en régénérant le numéro (pratique courante en compta).
@@ -68,19 +65,19 @@ export async function POST(req: Request) {
           userId: user.id,
           clientId,
           number,
-          issueDate: b.issueDate ? String(b.issueDate) : today,
-          dueDate: b.dueDate ? String(b.dueDate) : plus30,
+          issueDate: data.issueDate ?? today,
+          dueDate: data.dueDate ?? plus30,
           status: "draft",
           currency: "EUR",
-          vatRate: vatMode === "franchise" ? 0 : Number(b.vatRate) || 20,
+          vatRateCentiemes,
           vatMode,
-          paymentTerms: b.paymentTerms ? String(b.paymentTerms) : "Paiement à 30 jours",
-          notes: b.notes ? String(b.notes) : null,
+          paymentTerms: data.paymentTerms ?? "Paiement à 30 jours",
+          notes: data.notes ?? null,
           lines: {
-            create: lines.map((l: LineInput, i: number) => ({
+            create: lines.map((l, i: number) => ({
               description: l.description,
               quantity: l.quantity,
-              unitPrice: l.unitPrice,
+              unitPriceCents: l.unitPriceCents,
               sortOrder: i,
             })),
           },

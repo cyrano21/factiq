@@ -14,7 +14,7 @@ export async function GET(
     return new Response("Facture introuvable.", { status: 404 });
   }
 
-  const { xml, totalHT, totalVAT, totalTTC } = buildXml(inv);
+  const { xml, totalHTCents, totalVATCents, totalTCCCents } = buildXml(inv);
   const mode = (inv.vatMode === "franchise" ? "franchise" : "standard") as
     | "franchise"
     | "standard";
@@ -24,7 +24,7 @@ export async function GET(
     issueDate: inv.issueDate,
     dueDate: inv.dueDate,
     currency: inv.currency,
-    vatRate: inv.vatRate,
+    vatRateCentiemes: inv.vatRateCentiemes,
     vatMode: mode,
     paymentTerms: inv.paymentTerms,
     notes: inv.notes,
@@ -46,11 +46,11 @@ export async function GET(
     lines: inv.lines.map((l) => ({
       description: l.description,
       quantity: l.quantity,
-      unitPrice: l.unitPrice,
+      unitPriceCents: l.unitPriceCents,
     })),
-    totalHT,
-    totalVAT,
-    totalTTC,
+    totalHTCents,
+    totalVATCents,
+    totalTCCCents,
     facturxXml: xml,
   });
 

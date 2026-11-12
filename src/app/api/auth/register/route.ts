@@ -1,26 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createSession, hashPassword, publicUser } from "@/lib/auth";
+import { httpError, registerSchema } from "@/lib/validate";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const password = String(body.password ?? "");
-    const name = String(body.name ?? "").trim();
-
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "Adresse e-mail invalide." }, { status: 400 });
+    // Validation du corps : e-mail de format valide (≤ 200), mot de passe
+    // de 10 à 128 caractères (jamais trimé), nom de 1 à 100 caractères.
+    const parsed = registerSchema.safeParse(await req.json().catch(() => null));
+    const validation = httpError(parsed);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.firstError }, { status: 400 });
     }
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 8 caractères." },
-        { status: 400 }
-      );
-    }
-    if (!name) {
-      return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
-    }
+    const email = parsed.data!.email.toLowerCase();
+    const password = parsed.data!.password;
+    const name = parsed.data!.name;
 
     const existing = await db.user.findUnique({ where: { email } });
     if (existing) {

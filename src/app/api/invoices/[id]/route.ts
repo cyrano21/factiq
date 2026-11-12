@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { httpError, invoicePatchSchema } from "@/lib/validate";
 
 export async function PATCH(
   req: Request,
@@ -13,18 +14,41 @@ export async function PATCH(
   if (!invoice || invoice.userId !== user.id) {
     return NextResponse.json({ error: "Facture introuvable." }, { status: 404 });
   }
-  const b = await req.json();
-  const status = ["draft", "sent", "paid"].includes(String(b.status))
-    ? String(b.status)
-    : invoice.status;
-  // Une facture émise (sent) ou payée (paid) ne peut pas revenir en brouillon :
-  // sa numérotation engage la continuité de l'historique comptable.
-  if (invoice.status !== "draft" && status === "draft") {
+
+  // 1. Validation du corps : uniquement { status: draft | sent | paid }.
+  //    Tout autre champ est rejeté (objet strict) avec un message français.
+  const parsed = invoicePatchSchema.safeParse(await req.json().catch(() => null));
+  const validation = httpError(parsed);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.firstError }, { status: 400 });
+  }
+  const status = parsed.data!.status;
+
+  // 2. Transitions forward-only (pièces comptables) :
+  //    draft → sent | paid   OK
+  //    sent  → paid          OK
+  //    sent  → draft         409 (facture émise immuable)
+  //    paid  → draft | sent  409 (paid est un statut terminal)
+  //    X     → X             no-op 200
+  if (status === invoice.status) {
+    const unchanged = await db.invoice.update({ where: { id }, data: { status } });
+    return NextResponse.json({ invoice: unchanged });
+  }
+  if (invoice.status === "paid") {
+    return NextResponse.json(
+      { error: "Une facture payée est un statut terminal : elle ne peut plus être modifiée." },
+      { status: 409 }
+    );
+  }
+  if (status === "draft") {
+    // Une facture émise (sent) ne peut pas revenir en brouillon : sa
+    // numérotation engage la continuité de l'historique comptable.
     return NextResponse.json(
       { error: "Une facture émise ne peut pas revenir au statut brouillon." },
       { status: 409 }
     );
   }
+  // Transitions restantes autorisées : draft→sent, draft→paid, sent→paid.
   const updated = await db.invoice.update({ where: { id }, data: { status } });
   return NextResponse.json({ invoice: updated });
 }

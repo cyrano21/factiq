@@ -21,14 +21,15 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+import { computeTotalsCents, formatEUR, toCents } from "@/lib/money";
 import type { FactiqClient, FactiqUser } from "./types";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 type EditorLine = { description: string; quantity: string; unitPrice: string };
 
-const eur = (n: number) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
+// Affichage monétaire : TOUJOURS depuis des centimes entiers (src/lib/money.ts).
+const eur = (cents: number) => formatEUR(cents);
 
 export default function InvoiceEditor({
   open,
@@ -44,7 +45,8 @@ export default function InvoiceEditor({
   onCreated: () => void;
 }) {
   const [clientId, setClientId] = useState<string>("");
-  const [vatRate, setVatRate] = useState<string>("20");
+  // Taux mémorisé en CENTIÈMES de pourcentage : 2000 = 20 %, 550 = 5,5 %.
+  const [vatRate, setVatRate] = useState<string>("2000");
   const [paymentTerms, setPaymentTerms] = useState("Paiement à 30 jours");
   const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState(
@@ -58,12 +60,18 @@ export default function InvoiceEditor({
   const franchise = user.vatMode === "franchise";
 
   const totals = useMemo(() => {
-    const ht = lines.reduce(
-      (s, l) => s + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
-      0
+    // Aperçu en centimes : la saisie « 12,30 » est convertie via toCents.
+    // (une saisie invalide compte pour 0 à l'écran ; la soumission, elle,
+    // refuse explicitement un prix invalide).
+    const parsed = lines.map((l) => ({
+      quantity: Number(l.quantity) || 0,
+      unitPriceCents: toCents(l.unitPrice) ?? 0,
+    }));
+    return computeTotalsCents(
+      parsed,
+      Number(vatRate) || 0,
+      franchise ? "franchise" : "standard"
     );
-    const vat = franchise ? 0 : ht * ((Number(vatRate) || 0) / 100);
-    return { ht, vat, ttc: ht + vat };
   }, [lines, vatRate, franchise]);
 
   const setLine = (i: number, k: keyof EditorLine, v: string) =>
@@ -74,13 +82,20 @@ export default function InvoiceEditor({
       toast.error("Choisissez un client.");
       return;
     }
-    const payloadLines = lines
-      .filter((l) => l.description.trim() && Number(l.quantity) > 0)
-      .map((l) => ({
+    const payloadLines: { description: string; quantity: number; unitPriceCents: number }[] = [];
+    for (const l of lines) {
+      if (!l.description.trim() || !(Number(l.quantity) > 0)) continue;
+      const cents = toCents(l.unitPrice);
+      if (cents === null) {
+        toast.error(`Prix unitaire invalide pour « ${l.description.trim()} » — utilisez un format comme 12,30.`);
+        return;
+      }
+      payloadLines.push({
         description: l.description,
         quantity: Number(l.quantity),
-        unitPrice: Number(l.unitPrice) || 0,
-      }));
+        unitPriceCents: cents,
+      });
+    }
     if (payloadLines.length === 0) {
       toast.error("Ajoutez au moins une ligne valide (désignation + quantité).");
       return;
@@ -92,7 +107,7 @@ export default function InvoiceEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId,
-          vatRate: Number(vatRate),
+          vatRateCentiemes: Number(vatRate),
           issueDate,
           dueDate,
           paymentTerms,
@@ -153,9 +168,9 @@ export default function InvoiceEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="20">20 % (taux normal)</SelectItem>
-                  <SelectItem value="10">10 % (intermédiaire)</SelectItem>
-                  <SelectItem value="5.5">5,5 % (réduit)</SelectItem>
+                  <SelectItem value="2000">20 % (taux normal)</SelectItem>
+                  <SelectItem value="1000">10 % (intermédiaire)</SelectItem>
+                  <SelectItem value="550">5,5 % (réduit)</SelectItem>
                   <SelectItem value="0">0 % (exonéré)</SelectItem>
                 </SelectContent>
               </Select>
@@ -207,10 +222,9 @@ export default function InvoiceEditor({
                   />
                   <Input
                     className="w-28"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="P.U. €"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="P.U. € (12,30)"
                     value={l.unitPrice}
                     onChange={(e) => setLine(i, "unitPrice", e.target.value)}
                   />
@@ -241,18 +255,22 @@ export default function InvoiceEditor({
         <div className="mt-2 space-y-1.5 rounded-xl border border-white/[0.08] bg-muted/60 p-4 text-sm">
           <div className="flex justify-between text-muted-foreground">
             <span>Total HT</span>
-            <motion.span key={totals.ht} className="font-mono tabular-nums" initial={{ opacity: 0.4 }} animate={{ opacity: 1 }}>
-              {eur(totals.ht)}
+            <motion.span key={totals.totalHTCents} className="font-mono tabular-nums" initial={{ opacity: 0.4 }} animate={{ opacity: 1 }}>
+              {eur(totals.totalHTCents)}
             </motion.span>
           </div>
           <div className="flex justify-between text-muted-foreground">
-            <span>{franchise ? "TVA (art. 293 B)" : `TVA (${vatRate} %)`}</span>
-            <span className="font-mono tabular-nums">{eur(totals.vat)}</span>
+            <span>
+              {franchise
+                ? "TVA (art. 293 B)"
+                : `TVA (${(Number(vatRate) / 100).toLocaleString("fr-FR")} %)`}
+            </span>
+            <span className="font-mono tabular-nums">{eur(totals.totalVATCents)}</span>
           </div>
           <div className="flex justify-between border-t border-white/[0.08] pt-2 text-base font-semibold">
             <span>Total TTC</span>
             <span className="rounded-md bg-lime px-2.5 py-0.5 font-mono tabular-nums text-primary-foreground">
-              {eur(totals.ttc)}
+              {eur(totals.totalTCCCents)}
             </span>
           </div>
         </div>
