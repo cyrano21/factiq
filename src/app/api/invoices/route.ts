@@ -60,30 +60,45 @@ export async function POST(req: Request) {
     const plus30 = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     const vatMode = b.vatMode === "franchise" ? "franchise" : user.vatMode;
 
-    const invoice = await db.invoice.create({
-      data: {
-        userId: user.id,
-        clientId,
-        number: await nextInvoiceNumber(user.id),
-        issueDate: b.issueDate ? String(b.issueDate) : today,
-        dueDate: b.dueDate ? String(b.dueDate) : plus30,
-        status: "draft",
-        currency: "EUR",
-        vatRate: vatMode === "franchise" ? 0 : Number(b.vatRate) || 20,
-        vatMode,
-        paymentTerms: b.paymentTerms ? String(b.paymentTerms) : "Paiement à 30 jours",
-        notes: b.notes ? String(b.notes) : null,
-        lines: {
-          create: lines.map((l: LineInput, i: number) => ({
-            description: l.description,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            sortOrder: i,
-          })),
+    // Course sur la numérotation : l'index unique (userId, number) arbitre.
+    // 3 tentatives en régénérant le numéro (pratique courante en compta).
+    const createOne = (number: string) =>
+      db.invoice.create({
+        data: {
+          userId: user.id,
+          clientId,
+          number,
+          issueDate: b.issueDate ? String(b.issueDate) : today,
+          dueDate: b.dueDate ? String(b.dueDate) : plus30,
+          status: "draft",
+          currency: "EUR",
+          vatRate: vatMode === "franchise" ? 0 : Number(b.vatRate) || 20,
+          vatMode,
+          paymentTerms: b.paymentTerms ? String(b.paymentTerms) : "Paiement à 30 jours",
+          notes: b.notes ? String(b.notes) : null,
+          lines: {
+            create: lines.map((l: LineInput, i: number) => ({
+              description: l.description,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              sortOrder: i,
+            })),
+          },
         },
-      },
-      include: { lines: true, client: true },
-    });
+        include: { lines: true, client: true },
+      });
+
+    let invoice: Awaited<ReturnType<typeof createOne>> | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        invoice = await createOne(await nextInvoiceNumber(user.id));
+        break;
+      } catch (e) {
+        const code = (e as { code?: string })?.code;
+        if (code === "P2002" && attempt < 2) continue;
+        throw e;
+      }
+    }
     return NextResponse.json({ invoice });
   } catch {
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });

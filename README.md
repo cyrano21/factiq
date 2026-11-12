@@ -27,6 +27,11 @@ les plateformes agréées (PDP) de la réforme de facturation électronique
 - **Conformité commerciale** : pages légales (mentions légales, CGV,
   politique de confidentialité RGPD), consentement à l'inscription, SEO
   (metadata OpenGraph, JSON-LD Application+FAQ, sitemap.xml, robots.txt)
+- **Durcissement comptable** : factures émises inamovibles (pièce comptable,
+  409), numérotation sur compteur persistant jamais réutilisé
+  (`InvoiceCounter` + index unique), webhooks Stripe signés (HMAC),
+  cookies `secure` en production, vérification TS au build, règles
+  agents `AGENTS.md`
 
 ## Démarrage rapide
 
@@ -51,20 +56,25 @@ bun run dev               # http://localhost:3000
 export STRIPE_SECRET_KEY=sk_test_…
 export STRIPE_PRICE_PRO=price_…        # abonnement Pro 9 €/mois
 export STRIPE_PRICE_BUREAU=price_…     # Bureau 29 €/mois (optionnel)
+export STRIPE_WEBHOOK_SECRET=whsec_…   # webhook /api/billing/webhook
 ```
 
 Sans clé : le bouton de paiement affiche un message explicite (mode démo),
-tout le reste de l'application reste fonctionnel.
+tout le reste de l'application reste fonctionnel. L'upgrade de plan exige un
+paiement `paid` (retour de checkout vérifié, ou webhook signé HMAC
+`checkout.session.completed`).
 
 ## Tests
 
 ```bash
-bun run test:e2e    # nécessite `bun run dev` actif sur :3000
+bun run test:e2e    # nécessite `next dev` actif sur :3000
 ```
 
-22 vérifications de bout en bout : inscription, sessions, sécurité 401,
+28 vérifications de bout en bout : inscription, sessions, sécurité 401,
 CRUD clients/factures, statuts, PDF valide + XML embarqué, XML CII bien
-formé et totaux exacts, paramètres émetteur, pont Stripe, suppression.
+formé et totaux exacts, paramètres émetteur, pont Stripe, protection des
+pièces comptables (suppression/refus rétrogradation 409), numérotation
+sans réutilisation après suppression, suppression de brouillon.
 
 ## Architecture
 
@@ -116,7 +126,19 @@ Pour transformer cette base de code en activité qui encaisse, dans l'ordre :
 
 ## Roadmap
 
+- **P1 — Conformité documentaire** : PDF/A-3B strict (OutputIntent ICC + XMP
+  Factur-X + AF/AFRelationship), validation XSD/Schematron EN 16931 (outils
+  FNFE-MPE), mentions manquantes (nature de l'opération, SIREN client
+  visible, adresse de livraison, TVA sur les débits)
+- **P1 — Solidité monétaire** : passage des montants en centimes entiers
+  (`Int`) et support multi-taux de TVA par facture
+- Devis → facture, avoirs, paiements partiels, factures récurrentes,
+  relances, export comptable / archivage 10 ans
 - Connexion PDP (plateforme agréée) pour la transmission fluide
-- PDF/A-3 strict (OutputIntent + XMP Factur-X complet)
 - Envoi des factures par e-mail, relances automatiques
-- Notes de frais & acomptes
+
+## Règles agents
+
+Voir `AGENTS.md` : règles strictes propres aux documents comptables
+(immuabilité des factures émises, numérotation, montants, mentions
+légales, sécurité) — à lire avant toute contribution automatisée.

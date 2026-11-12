@@ -27,6 +27,7 @@ model User {
   plan         String    @default("free")
   createdAt    DateTime  @default(now())
   sessions     Session[]
+  counters     InvoiceCounter[]
   clients      Client[]
   invoices     Invoice[]
 }
@@ -73,6 +74,8 @@ model Invoice {
   notes          String?
   createdAt      DateTime      @default(now())
   lines          InvoiceLine[]
+
+  @@unique([userId, number])
 }
 
 model InvoiceLine {
@@ -83,4 +86,15 @@ model InvoiceLine {
   quantity    Float   @default(1)
   unitPrice   Float
   sortOrder   Int     @default(0)
+}
+
+// Compteur de numérotation par utilisateur et par année : ne décroît jamais,
+// même après suppression d'un brouillon (continuité de numérotation comptable).
+model InvoiceCounter {
+  userId     String
+  year       Int
+  lastNumber Int     @default(0)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, year])
 }

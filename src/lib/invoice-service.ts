@@ -97,16 +97,19 @@ export function buildXml(inv: NonNullable<Awaited<ReturnType<typeof loadInvoiceF
   return { xml: buildFacturXXml(input), ...input.totals };
 }
 
-/** Numérotation : FAC-YYYY-NNNN séquentielle par utilisateur et par année */
+/** Numérotation : FAC-YYYY-NNNN séquentielle par utilisateur et par année.
+ * Adossée à un compteur persistant (table InvoiceCounter) incrémenté
+ * atomiquement : le numéro ne décroît jamais, même après suppression d'un
+ * brouillon, et les créations concurrentes reçoivent chacune un numéro
+ * distinct. L'index unique @@unique([userId, number]) reste le garde-fou. */
 export async function nextInvoiceNumber(userId: string): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await db.invoice.count({
-    where: {
-      userId,
-      number: { startsWith: `FAC-${year}-` },
-    },
+  const counter = await db.invoiceCounter.upsert({
+    where: { userId_year: { userId, year } },
+    update: { lastNumber: { increment: 1 } },
+    create: { userId, year, lastNumber: 1 },
   });
-  return `FAC-${year}-${String(count + 1).padStart(4, "0")}`;
+  return `FAC-${year}-${String(counter.lastNumber).padStart(4, "0")}`;
 }
 
 export const FREE_INVOICE_LIMIT = 5;

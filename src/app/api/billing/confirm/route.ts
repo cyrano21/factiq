@@ -38,7 +38,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Session de paiement étrangère." }, { status: 403 });
   }
 
-  if (session.payment_status === "paid" || session.status === "complete") {
+  // Sécurité : upgrade uniquement si le paiement est réellement réglé.
+  // « complete » seul est insuffisant (session complétée sans encaissement).
+  if (session.payment_status === "paid") {
     const updated = await db.user.update({
       where: { id: user.id },
       data: { plan: "pro" },

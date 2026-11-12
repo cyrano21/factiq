@@ -27,7 +27,8 @@ export async function createSession(userId: string): Promise<string> {
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    // Cookie de session : secure en production (HTTPS), false en dev HTTP.
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     expires: expiresAt,
   });

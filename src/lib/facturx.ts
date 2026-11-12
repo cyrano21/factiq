@@ -69,11 +69,16 @@ export function computeTotals(
   vatRate: number,
   vatMode: "standard" | "franchise"
 ): FacturXTotals {
-  const totalHT = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-  const totalVAT = vatMode === "franchise" ? 0 : totalHT * (vatRate / 100);
+  // Règles EN 16931 :
+  // BR-CO-10 — Σ (LineTotalAmount) = TaxBasisTotalAmount : on arrondit chaque
+  // ligne puis on les somme (jamais la somme brute ré-arrondie, sinon le XML
+  // devient incohérent avec ses propres lignes).
+  // BR-CO-17 — CalculatedAmount = BasisAmount × taux, arrondi à 2 décimales.
+  const totalHT = lines.reduce((s, l) => s + round2(l.quantity * l.unitPrice), 0);
+  const totalVAT = vatMode === "franchise" ? 0 : round2(totalHT * (vatRate / 100));
   return {
     totalHT: round2(totalHT),
-    totalVAT: round2(totalVAT),
+    totalVAT,
     totalTTC: round2(totalHT + totalVAT),
   };
 }

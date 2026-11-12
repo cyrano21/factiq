@@ -107,9 +107,35 @@ code=$(curl -s -b "$JAR" -o /tmp/stripe.json -w "%{http_code}" -X POST "$BASE/ap
 check "POST /api/billing/checkout (mode démo)" 503 "$code"
 grep -q "STRIPE_SECRET_KEY" /tmp/stripe.json && ok "Message d'aide Stripe clair" || bad "Message Stripe absent"
 
-echo "═══ 13. Suppression de la facture de test ═══"
-code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/invoices/$INV_ID")
-check "DELETE /api/invoices/[id]" 200 "$code"
+echo "═══ 13. Pièce comptable : suppression refusée après émission ═══"
+code=$(curl -s -b "$JAR" -o /tmp/del1.json -w "%{http_code}" -X DELETE "$BASE/api/invoices/$INV_ID")
+check "DELETE facture émise → 409" 409 "$code"
+grep -q "pièce comptable" /tmp/del1.json && ok "Message légal (conservation 10 ans)" || bad "Message légal absent"
+
+# Retour en brouillon interdit également
+code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X PATCH "$BASE/api/invoices/$INV_ID" \
+  -H "Content-Type: application/json" -d '{"status":"draft"}')
+check "PATCH émise → draft refusé (409)" 409 "$code"
+
+# Un brouillon, lui, reste supprimable
+code=$(curl -s -b "$JAR" -o /tmp/inv2.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Draft\",\"quantity\":1,\"unitPrice\":100}]}")
+check "POST facture brouillon" 200 "$code"
+DRAFT_ID=$(python3 -c "import json;print(json.load(open('/tmp/inv2.json'))['invoice']['id'])")
+code=$(curl -s -b "$JAR" -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/invoices/$DRAFT_ID")
+check "DELETE brouillon" 200 "$code"
+
+# Le numéro du brouillon supprimé ne doit pas être réutilisé
+code=$(curl -s -b "$JAR" -o /tmp/inv3.json -w "%{http_code}" -X POST "$BASE/api/invoices" \
+  -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"lines\":[{\"description\":\"Suite\",\"quantity\":1,\"unitPrice\":100}]}")
+check "POST facture suivante" 200 "$code"
+NUM3=$(python3 -c "import json;print(json.load(open('/tmp/inv3.json'))['invoice']['number'])")
+NUM2=$(python3 -c "import json;print(json.load(open('/tmp/inv2.json'))['invoice']['number'])")
+if [ "${NUM3##*-}" -gt "${NUM2##*-}" ]; then ok "Numérotation sans réutilisation ($NUM2 supprimé → $NUM3)"; else bad "Numéro réutilisé ($NUM2 → $NUM3)"; fi
+INV3_ID=$(python3 -c "import json;print(json.load(open('/tmp/inv3.json'))['invoice']['id'])")
+curl -s -b "$JAR" -o /dev/null -X DELETE "$BASE/api/invoices/$INV3_ID"
 
 echo ""
 echo "════════ RÉSULTAT : $PASS réussis, $FAIL échoués ════════"
